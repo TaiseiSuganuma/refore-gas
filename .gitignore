@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+dist/
+.env
+*.log
+
+# clasp（プロジェクトごとに scriptId が異なるため除外）
+.clasp.json
+.clasprc.json

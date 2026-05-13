@@ -1,0 +1,19 @@
+{
+  "name": "registry-ocr",
+  "version": "1.0.0",
+  "description": "不動産登記簿 PDF を OCR してスプレッドシートへ転記する GAS プロジェクト",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "open": "clasp open",
+    "deploy": "clasp deploy",
+    "logs": "clasp logs",
+    "login": "clasp login"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "@types/google-apps-script": "^1.0.83",
+    "typescript": "^5.4.5"
+  }
+}

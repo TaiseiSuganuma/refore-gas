@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>不動産登記PDF 取り込み</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Hiragino Sans", "Meiryo", sans-serif;
+      font-size: 14px;
+      color: #333;
+      background: #f8f9fa;
+      padding: 20px;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #1a73e8;
+    }
+
+    /* ドロップゾーン */
+    #drop-zone {
+      border: 2px dashed #c5cae9;
+      border-radius: 10px;
+      background: #fff;
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    #drop-zone.dragover {
+      border-color: #1a73e8;
+      background: #e8f0fe;
+    }
+    #drop-zone .icon {
+      font-size: 40px;
+      margin-bottom: 8px;
+      display: block;
+    }
+    #drop-zone p { color: #666; margin-bottom: 10px; line-height: 1.5; }
+    #drop-zone small { color: #999; }
+
+    #file-input { display: none; }
+
+    .btn {
+      display: inline-block;
+      padding: 8px 18px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #1a73e8; color: #fff; }
+    .btn-outline { background: #fff; color: #1a73e8; border: 1px solid #1a73e8; margin-top: 10px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ファイル選択後の表示 */
+    #selected-file {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: #e8f5e9;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #2e7d32;
+      word-break: break-all;
+    }
+    #selected-file .remove-btn {
+      float: right;
+      cursor: pointer;
+      color: #999;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+
+    /* アクションエリア */
+    #action-area {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    /* ローディング */
+    #loading {
+      display: none;
+      text-align: center;
+      padding: 24px 0;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading p { color: #555; font-size: 13px; }
+
+    /* 結果表示 */
+    #result-area { display: none; margin-top: 16px; }
+    .result-card {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      padding: 14px 16px;
+    }
+    .result-card.success { border-left: 4px solid #34a853; }
+    .result-card.error   { border-left: 4px solid #ea4335; }
+    .result-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .result-title.success { color: #2e7d32; }
+    .result-title.error   { color: #c62828; }
+    table.parsed { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+    table.parsed th {
+      text-align: left; padding: 4px 8px;
+      color: #666; font-weight: 500;
+      white-space: nowrap; width: 110px;
+    }
+    table.parsed td { padding: 4px 8px; color: #333; word-break: break-all; }
+    table.parsed tr { border-bottom: 1px solid #f0f0f0; }
+
+    /* エラーメッセージ */
+    .error-msg { color: #c62828; font-size: 13px; line-height: 1.5; }
+
+    /* 警告バナー */
+    .warn-banner {
+      display: none;
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: #fff3e0;
+      border-left: 3px solid #fb8c00;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #e65100;
+    }
+  </style>
+</head>
+<body>
+
+<h2>不動産登記PDF 取り込み</h2>
+
+<!-- ドロップゾーン -->
+<div id="drop-zone" onclick="document.getElementById('file-input').click()">
+  <span class="icon">📄</span>
+  <p>ここにPDFをドラッグ＆ドロップ<br>または</p>
+  <button class="btn btn-primary" type="button" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
+    ファイルを選択
+  </button>
+  <br><small>対応形式: PDF（最大 15MB）</small>
+</div>
+<input type="file" id="file-input" accept="application/pdf,.pdf">
+
+<div class="warn-banner" id="warn-banner"></div>
+<div id="selected-file"></div>
+
+<!-- ローディング -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>OCR処理中です。しばらくお待ちください…<br><small>（PDFのサイズによって1〜2分かかる場合があります）</small></p>
+</div>
+
+<!-- アクション -->
+<div id="action-area">
+  <button class="btn btn-outline" id="cancel-btn" onclick="google.script.host.close()">キャンセル</button>
+  <button class="btn btn-primary" id="submit-btn" disabled onclick="submitFile()">取り込む</button>
+</div>
+
+<!-- 結果 -->
+<div id="result-area"></div>
+
+<script>
+  var selectedFile = null;
+
+  // ドラッグ＆ドロップ
+  var dropZone = document.getElementById('drop-zone');
+
+  dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+  dropZone.addEventListener('dragleave', function() {
+    dropZone.classList.remove('dragover');
+  });
+  dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    var files = e.dataTransfer.files;
+    if (files.length > 0) handleFileSelect(files[0]);
+  });
+
+  // ファイル選択ボタン
+  document.getElementById('file-input').addEventListener('change', function() {
+    if (this.files.length > 0) handleFileSelect(this.files[0]);
+  });
+
+  function handleFileSelect(file) {
+    hideWarn();
+    clearResult();
+
+    // PDF 検証
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      showWarn('PDFファイルのみ対応しています（選択されたファイル: ' + escHtml(file.name) + '）');
+      return;
+    }
+    // サイズ検証（15MB）
+    if (file.size > 15 * 1024 * 1024) {
+      showWarn('ファイルサイズが大きすぎます（上限 15MB、選択ファイル: ' + formatBytes(file.size) + '）');
+      return;
+    }
+
+    selectedFile = file;
+    document.getElementById('selected-file').style.display = 'block';
+    document.getElementById('selected-file').innerHTML =
+      '📄 ' + escHtml(file.name) + ' (' + formatBytes(file.size) + ')' +
+      '<span class="remove-btn" onclick="clearFile()">✕</span>';
+    document.getElementById('submit-btn').disabled = false;
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    document.getElementById('selected-file').style.display = 'none';
+    document.getElementById('file-input').value = '';
+    document.getElementById('submit-btn').disabled = true;
+    clearResult();
+  }
+
+  function submitFile() {
+    if (!selectedFile) return;
+
+    setLoading(true);
+    hideWarn();
+    clearResult();
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      // "data:application/pdf;base64,<DATA>" から DATA 部分だけ取り出す
+      var dataUrl = e.target.result;
+      var base64 = dataUrl.split(',')[1];
+
+      var payload = {
+        base64: base64,
+        fileName: selectedFile.name,
+        mimeType: selectedFile.type || 'application/pdf'
+      };
+
+      google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onFailure)
+        .processRegistryPdf(payload);
+    };
+    reader.onerror = function() {
+      setLoading(false);
+      showResult(false, 'ファイルの読み込みに失敗しました。', null);
+    };
+    reader.readAsDataURL(selectedFile);
+  }
+
+  function onSuccess(result) {
+    setLoading(false);
+    showResult(result.success, result.message, result.data || null);
+  }
+
+  function onFailure(err) {
+    setLoading(false);
+    showResult(false, 'サーバーエラー: ' + (err.message || String(err)), null);
+  }
+
+  // ---- UI ヘルパー ----
+
+  function setLoading(show) {
+    document.getElementById('loading').style.display = show ? 'block' : 'none';
+    document.getElementById('drop-zone').style.display = show ? 'none' : 'block';
+    document.getElementById('action-area').style.display = show ? 'none' : 'flex';
+    document.getElementById('selected-file').style.display = (show || !selectedFile) ? 'none' : 'block';
+  }
+
+  function showResult(success, message, data) {
+    var area = document.getElementById('result-area');
+    var type = success ? 'success' : 'error';
+    var icon = success ? '✅' : '❌';
+    var title = success ? '取り込み完了' : '取り込み失敗';
+
+    var inner = '<div class="result-card ' + type + '">' +
+      '<div class="result-title ' + type + '">' + icon + ' ' + title + '</div>';
+
+    if (success && data) {
+      inner += '<table class="parsed">' +
+        row('所在',      data.location  || '（取得できませんでした）') +
+        row('地番',      data.lotNumber || '（取得できませんでした）') +
+        row('地目',      data.landType  || '（取得できませんでした）') +
+        row('地積（㎡）', data.area      || '（取得できませんでした）') +
+        row('所有者氏名', data.ownerName || '（取得できませんでした）') +
+        '</table>' +
+        '<p style="margin-top:10px;font-size:12px;color:#555;">シートの最終行に追記しました。</p>';
+    } else if (!success) {
+      inner += '<p class="error-msg">' + escHtml(message) + '</p>';
+    }
+
+    inner += '</div>';
+    area.innerHTML = inner;
+    area.style.display = 'block';
+
+    if (success) clearFile();
+  }
+
+  function row(label, value) {
+    return '<tr><th>' + escHtml(label) + '</th><td>' + escHtml(value) + '</td></tr>';
+  }
+
+  function clearResult() {
+    var area = document.getElementById('result-area');
+    area.style.display = 'none';
+    area.innerHTML = '';
+  }
+
+  function showWarn(msg) {
+    var el = document.getElementById('warn-banner');
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+  }
+
+  function hideWarn() {
+    document.getElementById('warn-banner').style.display = 'none';
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+</script>
+</body>
+</html>
