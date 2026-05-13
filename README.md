@@ -9,9 +9,14 @@
 refore-gas/
 ├── projects/                 # 実プロジェクト群（GAS 1 つ = 1 ディレクトリ）
 │   └── registry-ocr/         # 不動産登記簿 PDF を OCR してシートへ転記
+│       ├── README.md         # セットアップ・使い方
+│       ├── docs/             # 仕様書（specification.md ほか）
+│       └── src/
 └── templates/
     └── gas-local-template/   # 新規 GAS プロジェクトの雛形
 ```
+
+各プロジェクトの **仕様書は `projects/<name>/docs/`** に置きます。GitHub 上で直接プレビューしてください。
 
 ## 新しい GAS プロジェクトを追加する
 
