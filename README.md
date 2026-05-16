@@ -3,14 +3,23 @@
 リフォレ社内業務の自動化に使う Google Apps Script (GAS) プロジェクトを集約したモノレポです。
 ローカルで TypeScript + [clasp](https://github.com/google/clasp) を用いて開発し、GAS へデプロイします。
 
+> **クライアント・案件全体の背景は [`docs/client-overview.md`](./docs/client-overview.md) を参照してください。**
+> 新しい作業に着手する際は、まずこのドキュメントで業務文脈を把握することを推奨します。
+
 ## ディレクトリ構成
 
 ```
 refore-gas/
+├── docs/
+│   └── client-overview.md    # クライアント・案件全体のドキュメント
 ├── projects/                 # 実プロジェクト群（GAS 1 つ = 1 ディレクトリ）
-│   └── registry-ocr/         # 不動産登記簿 PDF を OCR してシートへ転記
-│       ├── README.md         # セットアップ・使い方
-│       ├── docs/             # 仕様書（specification.md ほか）
+│   ├── registry-ocr/         # 不動産登記簿 PDF を OCR してシートへ転記
+│   │   ├── README.md
+│   │   ├── docs/             # 仕様書
+│   │   └── src/
+│   └── document-generator/   # 案件確定時の書類自動生成（Phase 0: 仕様化中）
+│       ├── README.md
+│       ├── docs/
 │       └── src/
 └── templates/
     └── gas-local-template/   # 新規 GAS プロジェクトの雛形
