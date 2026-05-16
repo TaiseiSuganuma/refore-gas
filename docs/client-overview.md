@@ -75,13 +75,19 @@
 - **OCR（registry-ocr）はフォームに統合**（登記簿PDF添付欄から自動入力）
 - 書類は **14種類**（A系統3 + B系統2 + 見積/請求/社内4 + 法務局5）
 
+**月次集計の重要性**:
+複数の営業担当が個別に案件サマリーシートを作成・更新し、月末に **月次チェックリスト** で
+担当別・全体の売上・利益・面積を集計する運用がある（[既存形式サンプル](https://docs.google.com/spreadsheets/d/126zJY6MttfzXMYnRmxlUkAOMy6f_HQwrc27Sz8F82DY/edit)）。
+このため、案件マスタは **集計の Source of Truth** として設計し、各案件サマリーシート編集時に
+主要列（担当営業・契約日・売上・利益・面積など）を自動転記する。
+
 **段階的アプローチ**:
 - Phase 1: 既存「案件一覧」から土地売買契約書1書類をPDF出力するMVP（着手予定）
 - Phase 2: 複数書類同時出力 + 案件パターン → 書類セット自動判定
 - Phase 3: 明細繰返し対応、A系統B系統の契約書実装
-- Phase 4: **フォーム → 案件サマリーシート自動生成**（North Star の中核移行）
+- Phase 4: **フォーム → 案件サマリーシート自動生成 + 集計可能な案件マスタ構築**（North Star中核 + 集計基盤）
 - Phase 5: **OCR統合**（フォームに登記簿PDF添付欄）
-- Phase 6: 見積書・請求書・法務局関連・社内シート対応
+- Phase 6: **月次チェックリスト自動生成** + 見積書・請求書・法務局関連・社内シート対応
 
 詳細: [`projects/document-generator/docs/specification.md`](../projects/document-generator/docs/specification.md)
 
