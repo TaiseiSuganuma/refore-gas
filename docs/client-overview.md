@@ -66,17 +66,22 @@
 
 **書類リスト管理**: [リフォレ開発管理シート](https://docs.google.com/spreadsheets/d/1Am4A91sC05YPhq5gi2aBLe7zzjuPEp9pNy0xLh6hs8w/edit)
 
-**ソリューション概要**:
-- スプレッドシートに入力された案件情報をもとに、Google Docs / Sheets テンプレートへ差し込み
-- スプレッドシートのカスタムメニューから出力したい書類を選択 → 案件サブフォルダに PDF として出力
-- 書類は **14 種類** 確定（A 系統 3、B 系統 2、見積/請求/社内 4、法務局 5）
-- 案件のパターン（A①〜B②）で出力書類セットが決まる構造
-- 既存実装の見積書 PDF 出力（`generateEstimatePdfFromActiveRow`）も含めて作り直す方針
+**North Star（目標形）**:
+「フォーム入力 → 案件ごとのスプレッドシート＋フォルダ自動生成 → ダイアログから書類選択 → PDF出力」
 
-**進行状況**:
-- Phase 0: 情報収集・仕様化（完了間近）
-- Phase 1: MVP = **土地売買契約書（A③）** を Docs テンプレ + 単純差し込みで PDF 出力（着手予定）
-- 以降の Phase は `projects/document-generator/docs/specification.md` 参照
+- 新規案件は **フォームから入力**（修正は自動生成された案件サマリーシート上で）
+- **1案件 = 1スプレッドシート + 1フォルダ**（PDFと並んでサマリーシートが格納される）
+- 全社の **案件一覧マスタ** には1行追記（各案件サマリーへのリンク集として機能）
+- **OCR（registry-ocr）はフォームに統合**（登記簿PDF添付欄から自動入力）
+- 書類は **14種類**（A系統3 + B系統2 + 見積/請求/社内4 + 法務局5）
+
+**段階的アプローチ**:
+- Phase 1: 既存「案件一覧」から土地売買契約書1書類をPDF出力するMVP（着手予定）
+- Phase 2: 複数書類同時出力 + 案件パターン → 書類セット自動判定
+- Phase 3: 明細繰返し対応、A系統B系統の契約書実装
+- Phase 4: **フォーム → 案件サマリーシート自動生成**（North Star の中核移行）
+- Phase 5: **OCR統合**（フォームに登記簿PDF添付欄）
+- Phase 6: 見積書・請求書・法務局関連・社内シート対応
 
 詳細: [`projects/document-generator/docs/specification.md`](../projects/document-generator/docs/specification.md)
 
