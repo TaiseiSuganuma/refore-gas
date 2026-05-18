@@ -58,7 +58,7 @@
 
 詳細: [`projects/registry-ocr/docs/specification.md`](../projects/registry-ocr/docs/specification.md)
 
-### 2. document-generator（Phase 0 完了間近、Phase 1 着手予定 = 最初の主要案件）
+### 2. document-generator（Phase 0 完了、Phase 1 進行中 = 最初の主要案件）
 
 **課題**: 仲介の **案件確定時に作成する書類が多く**、毎回事務担当が手作業で書類を作成・編集しており負荷が大きい（このプロジェクトを依頼された直接の動機）。
 

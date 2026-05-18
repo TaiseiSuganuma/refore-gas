@@ -8,8 +8,9 @@ PDF を指定 Drive フォルダに出力する GAS プロジェクトです。
 
 ## ステータス
 
-🚧 **Phase 0（情報収集・仕様化）** — マスタシートとテンプレートの実物を確認しながら、
-仕様書を確定中。実装はまだ開始していません。
+🚧 **Phase 1（土地売買契約書 MVP）進行中** — 設計・準備は完了し、
+ユーザーのシート編集作業（[`docs/phase1-user-tasks.md`](./docs/phase1-user-tasks.md)）の完了待ち。
+進捗の詳細は [`docs/schedule.md`](../../docs/schedule.md) を参照。
 
 ## 機能概要（予定）
 
