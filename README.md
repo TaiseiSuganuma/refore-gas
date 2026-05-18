@@ -3,14 +3,17 @@
 リフォレ社内業務の自動化に使う Google Apps Script (GAS) プロジェクトを集約したモノレポです。
 ローカルで TypeScript + [clasp](https://github.com/google/clasp) を用いて開発し、GAS へデプロイします。
 
+> **作業開始前に [`docs/schedule.md`](./docs/schedule.md) で現在の進捗を確認してください。**
+> 全プロジェクトの Phase 進行状況とチェックボックス形式のタスクを管理しています。
+>
 > **クライアント・案件全体の背景は [`docs/client-overview.md`](./docs/client-overview.md) を参照してください。**
-> 新しい作業に着手する際は、まずこのドキュメントで業務文脈を把握することを推奨します。
 
 ## ディレクトリ構成
 
 ```
 refore-gas/
 ├── docs/
+│   ├── schedule.md           # 進捗 & スケジュール（最初に確認）
 │   └── client-overview.md    # クライアント・案件全体のドキュメント
 ├── projects/                 # 実プロジェクト群（GAS 1 つ = 1 ディレクトリ）
 │   ├── registry-ocr/         # 不動産登記簿 PDF を OCR してシートへ転記
