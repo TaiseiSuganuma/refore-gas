@@ -137,3 +137,18 @@ const values = sheet.getRange(1, 1, 100, 1).getValues(); // 1回のAPIコール
 ## README の更新
 
 - 機能追加・変更・スコープ変更を行った場合は、該当プロジェクトの `README.md` を更新する
+
+---
+
+## 自動化ループ（Claude Code 自走）
+
+`dev` ブランチには Claude Code の scheduled task が 1 時間おきに自走で進めたコミットが含まれる。
+人間判断が必要なときは Slack `#dev-refore` チャンネルに通知され、返信すると次回起動時に反映される。
+
+- 運用ドキュメント: [`docs/automation/README.md`](./docs/automation/README.md)
+- 自走プロンプト本体: [`docs/automation/orchestrator.md`](./docs/automation/orchestrator.md)
+- 現在の状態: [`docs/automation/state.md`](./docs/automation/state.md)
+- 実行ログ: [`docs/automation/runs/`](./docs/automation/runs/)
+
+GAS の制約（`clasp push` 禁止・OAuth スコープ無断追加禁止・テンプレ直接編集禁止）はループでも厳守される。
+dev ブランチに溜まったコミットは人間がレビューしてから main に merge する。
