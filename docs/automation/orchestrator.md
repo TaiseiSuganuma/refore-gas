@@ -399,3 +399,36 @@ push: dev ブランチ <commit-hash>
 
 - `#dev-refore` = `C0B4PCAKA6Q`（このモノレポ用）
 - `#dev-kumo` = `C0B4MK2EWRF`（kumo-next 用、このループでは使わない）
+
+## Slack 投稿の実装方法（重要）
+
+このループからの Slack 投稿は **Bot Token 経由で curl** で行う（Bot 名義で投稿されるとユーザーに通知が飛ぶため）。
+
+### 投稿（送信）
+
+`mcp__b45e988e-be8b-448e-b692-3076cceb680f__slack_send_message` は **使わない**（自分のユーザートークンで投稿されると通知が飛ばない）。代わりに以下:
+
+```bash
+source ~/.config/claude-bot/token.env
+curl -s -X POST https://slack.com/api/chat.postMessage \
+  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d '{"channel":"C0B4PCAKA6Q","text":"<@U0AAT9XNLHG> 本文..."}'
+```
+
+ポイント:
+- `channel` は channel ID（`C0B4PCAKA6Q` = #dev-refore）
+- 通知を確実に飛ばすため、本文の **冒頭に `<@U0AAT9XNLHG>` メンション** を必ず含める
+- スレッド返信する場合は `"thread_ts": "<親メッセージのts>"` を追加
+- 改行を含む長文は JSON エスケープが必要（`\n`）。複雑な本文は heredoc + `jq -Rs .` などで安全に組み立てる
+
+### 読み取り（受信・スレッド読み取り）
+
+ユーザートークンの MCP を使って OK:
+- `mcp__b45e988e-be8b-448e-b692-3076cceb680f__slack_read_thread` — Slack 待ち解消時の返信読み取り
+- `mcp__b45e988e-be8b-448e-b692-3076cceb680f__slack_read_channel` — チャンネル直近メッセージ確認
+
+### 投稿失敗時
+
+- `curl` が exit 0 でも `{"ok":false,"error":"..."}` が返ることがある。レスポンス JSON の `ok` フィールドを確認すること
+- トークン無効・チャンネル参加していない場合は Slack 投稿せずに `state.md` の `consecutive_failures` をインクリメントして停止
