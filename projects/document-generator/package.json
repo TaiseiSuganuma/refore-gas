@@ -4,10 +4,11 @@
   "description": "スプレッドシートの案件情報をもとに Google Docs テンプレートへ差し込み、契約書等の PDF を出力する GAS プロジェクト",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "push": "clasp push",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/appsscript.json dist/appsscript.json",
+    "push": "npm run build && clasp push --force",
     "pull": "clasp pull",
     "open": "clasp open",
-    "deploy": "clasp deploy",
+    "deploy": "npm run build && clasp deploy",
     "logs": "clasp logs",
     "login": "clasp login"
   },
