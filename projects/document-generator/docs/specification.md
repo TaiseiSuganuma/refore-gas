@@ -159,6 +159,14 @@ Drive/
 **書類マスタシート新設**:
 - 書類 ID、書類名、テンプレ ID、対応パターン、命名規則、明細含むか
 - 詳細は [`master-sheet-schema.md`](./master-sheet-schema.md)
+- 「出力書類リスト」シート（人間運用）から手動で初期データ転記
+
+**取引先マスタ・代理人マスタ新設**:
+- 伐採業者・買主など法人 → 取引先マスタ（[`master-sheet-schema.md` § 9](./master-sheet-schema.md#9-取引先マスタシートphase-2-新設)）
+- 法務局申請書の代理人 → 代理人マスタ（[§ 10](./master-sheet-schema.md#10-代理人マスタシートphase-2-新設)）
+- 案件マスタに `買主取引先ID` / `売主取引先ID` / `代理人ID` 列を追加し、プルダウン参照
+- 売主（個人地主）は案件マスタに直接記載（マスタ化しない）
+- 自社（リフォレ）情報はテンプレに固定文字列で残す（マスタ化しない）
 
 **GAS 機能追加**:
 - メニュー「書類発行」→ 選択行を抽出 → 各行の ON 書類を順次生成
@@ -258,7 +266,11 @@ Drive/
 
 ## 5. 書類一覧（14種類）
 
-詳細は [`documents/`](./documents/) 配下に書類ごとに記載。
+書類リストの **Source of Truth はスプレッドシート内の「出力書類リスト」シート**（2026-05-27 移行）。
+[【リフォレ】書類自動生成](https://docs.google.com/spreadsheets/d/12BEUxTqnADqWsmffGWos0tFe08FohEE-0RQJbLNAnEk/edit?gid=1824029250#gid=1824029250) を参照。
+
+シートの列構成・【原本】と【テンプレ】の使い分けは [`documents/README.md`](./documents/README.md) を参照。
+書類ごとの個別仕様（プレースホルダ位置）は [`documents/`](./documents/) 配下に記載。
 
 | # | 書類ID | 書類名 | 対象パターン | 明細繰返し | 対応 Phase |
 |---|---|---|---|---|---|
@@ -323,29 +335,55 @@ Drive/
 
 ---
 
-## 11. 関連ファイル一覧（実装時に追記）
+## 11. 関連ファイル一覧
+
+### Phase 1 実装済み
 
 | ファイル | 役割 |
 |---|---|
-| `src/Code.ts` | GAS グローバル関数（onOpen, generateLandPurchaseContract, generateBatchDocuments 等） |
-| `src/dialog.html` | バッチ実行結果ダイアログ |
-| `src/handlers/documentHandler.ts` | 単発書類生成オーケストレーション（Phase 1） |
-| `src/handlers/batchHandler.ts` | 複数案件×複数書類のバッチ処理（Phase 2〜） |
-| `src/handlers/onFormSubmitHandler.ts` | フォーム送信トリガー処理（Phase 4〜） |
-| `src/handlers/onEditHandler.ts` | パターン選択時の書類列初期チェック投入（Phase 2〜） |
-| `src/services/templateService.ts` | Docs/Sheets テンプレ複製・PDF化 |
-| `src/services/placeholderService.ts` | プレースホルダ置換 |
-| `src/services/masterSheetService.ts` | 案件マスタ読み書き |
-| `src/services/documentMasterService.ts` | 書類マスタ読み込み（Phase 2〜） |
-| `src/services/projectFolderService.ts` | 案件フォルダ作成・URL 管理 |
-| `src/services/patternResolver.ts` | パターン → 必要書類セット判定（Phase 2〜） |
-| `src/services/versionedNameService.ts` | 同名 PDF があれば `_v2`, `_v3` を付ける |
-| `src/types/index.ts` | 型定義 |
-| `src/appsscript.json` | GAS マニフェスト |
+| `src/Code.ts` | GAS グローバル関数（onOpen, generateLandPurchaseContract, doGet, doPost） |
+| `src/types/index.ts` | 型定義（CaseRow, PropertyRow, Settings, LandPurchaseContractContext, DocumentGenerationResult 等） |
+| `src/handlers/documentHandler.ts` | 単発書類生成オーケストレーション（設定取得 → アクティブ行取得 → 物件行取得 → プレースホルダ生成 → PDF 出力）（Phase 1） |
+| `src/handlers/webAppHandler.ts` | doGet / doPost Web App スタブ（将来の API エンドポイント用） |
+| `src/services/sheetService.ts` | 案件一覧・物件・設定シートの読み込み（getSettings / getActiveCaseRow / getPropertyRowsByCaseId 等）（Phase 1） |
+| `src/services/templateService.ts` | Docs テンプレ複製・プレースホルダ一括置換・PDF 化（generatePdfFromTemplate）（Phase 1） |
+| `src/services/placeholderService.ts` | `{{key}}` 置換・和暦変換・カンマ整形（buildLandPurchaseContractContext）（Phase 1） |
+| `src/utils/logger.ts` | `Logger_` 名前空間（info / warn / error → Stackdriver console）（Phase 1） |
+| `src/appsscript.json` | GAS マニフェスト（OAuth スコープ: spreadsheets, drive, documents, script.container.ui） |
+
+### Phase 2〜 予定（未実装）
+
+| ファイル | 役割 | 追加 Phase |
+|---|---|---|
+| `src/dialog.html` | バッチ実行結果ダイアログ（成功件数・失敗件数・詳細リスト） | Phase 2 |
+| `src/handlers/batchHandler.ts` | 複数案件×複数書類のバッチ処理 | Phase 2 |
+| `src/handlers/onEditHandler.ts` | パターン選択時の書類列初期チェック投入 | Phase 2 |
+| `src/handlers/onFormSubmitHandler.ts` | フォーム送信トリガー処理 | Phase 4 |
+| `src/services/documentMasterService.ts` | 「出力書類リスト」シート読み込み | Phase 2 |
+| `src/services/projectFolderService.ts` | 案件フォルダ作成・URL 管理（`案件/YYYY/MM/<案件ID>_<地域>_<相手方名>/`） | Phase 2 |
+| `src/services/patternResolver.ts` | パターン（A①/A②等） → 必要書類セット判定 | Phase 2 |
+| `src/services/versionedNameService.ts` | 同名 PDF に `_v2`, `_v3` ... を付与 | Phase 2 |
 
 ---
 
 ## 12. 設計変更履歴
+
+### 2026-05-27: 出力書類リストのスプレッドシート移行と取引先マスタ導入
+
+**変更内容**:
+1. 出力書類リスト（14 書類の【原本】【テンプレ】Docs URL）を `documents/README.md` の表からスプレッドシート内の「出力書類リスト」シートに移行。
+2. 取引先マスタ・代理人マスタを Phase 2 で新設することを決定（伐採業者・買主など法人と、法務局申請書の代理人をマスタ化）。
+3. 売主（個人地主）情報は案件マスタに直接記載（マスタ化しない）。
+4. 自社（リフォレ）情報はテンプレに固定文字列で残す（マスタ化しない）。
+
+**背景**:
+- 【原本】テンプレに「ほぼこの会社／代理人」という慣行で印字されていた固定取引先情報が、案件によって差し替えが必要なケースがあると判明。
+- 紙運用時代の固定印字をそのままシステム化すると差し替えが手作業になるため、マスタ参照型に切り替える。
+
+**影響範囲**:
+- [`master-sheet-schema.md`](./master-sheet-schema.md) — § 9〜11 を追記
+- [`documents/README.md`](./documents/README.md) — 全面書き直し（書類一覧の SoT はシート側に）
+- 各書類のプレースホルダ案 — 取引先/代理人を `{{買主会社名}}` `{{代理人氏名}}` 等のキーで差し込む方針に変更
 
 ### 2026-05-27: 「1案件=1スプレッドシート」から「1案件=1行+1フォルダ」に変更
 

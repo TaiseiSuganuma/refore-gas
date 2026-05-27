@@ -32,7 +32,7 @@ document-generator
 - `docs/automation/state.md`（`completed` に追記）
 
 ## コミット
-- （コミット後に記入）
+- b866651 B(document-generator): Phase 1 sheetService.ts 実装
 
 ## Slack 通知
 完了報告を投稿

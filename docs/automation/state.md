@@ -4,7 +4,7 @@ current_task: null
 waiting_for: null
 last_run_date: "2026-05-27"
 consecutive_failures: 0
-today_commits: 7
+today_commits: 8
 today_commits_date: "2026-05-27"
 ---
 
@@ -26,6 +26,8 @@ today_commits_date: "2026-05-27"
   `src/handlers/documentHandler.ts`: 土地売買契約書 単発生成オーケストレーション（getSettings → getActiveCaseRow → getPropertyRowsByCaseId → buildLandPurchaseContractContext → generatePdfFromTemplate）
 - `code-entry-point` — 2026-05-27
   `src/Code.ts`: onOpen メニュー「書類出力」→「土地売買契約書」、generateLandPurchaseContract グローバル関数追加
+- `spec-doc-update` — 2026-05-27
+  specification.md § 11 関連ファイル一覧を Phase 1 実装済みに合わせて更新。TypeScript バージョンを ~5.4.5 に固定（5.9.x の .bin/tsc パス問題を回避）
 
 ## skip リスト
 
@@ -42,4 +44,4 @@ today_commits_date: "2026-05-27"
 - 起動方式: 各実行は独立セッション。orchestrator.md と state.md から状態復元する
 - 安全ガード: 連続失敗3回 / 1日コミット30件 / paused=true で自動停止
 - Slack 通知方針: 厳しめ（種別 B/C は仕様書に書いてないことを推測しない、必ず Slack で確認）
-- 現状: document-generator Phase 1 ユーザー作業完了（2026-05-27）。Claude 実装タスク進行中（types 完了、sheetService 完了、templateService 完了、placeholderService 完了、documentHandler 完了、Code.ts onOpen+エントリ完了）。次は「動作確認とログ整備」または「仕様書の実装内容反映」。
+- 現状: document-generator Phase 1 の Claude 実装タスクがすべて完了（2026-05-27）。残りは「動作確認とログ整備」（ユーザーが clasp push 後に実施）のみ。Phase 1 コードは typecheck 通過済み、clasp push 待ち。
