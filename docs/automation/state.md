@@ -4,7 +4,7 @@ current_task: null
 waiting_for: null
 last_run_date: "2026-05-27"
 consecutive_failures: 0
-today_commits: 4
+today_commits: 5
 today_commits_date: "2026-05-27"
 ---
 
@@ -20,6 +20,8 @@ today_commits_date: "2026-05-27"
   `src/services/sheetService.ts`: 案件一覧・物件・設定シート読み込み実装（getSettings / getAllCaseRows / getCaseRowById / getActiveCaseRow / getPropertyRowsByCaseId）
 - `template-service` — 2026-05-27
   `src/services/templateService.ts`: Docs テンプレ複製・プレースホルダ置換・PDF 化実装（generatePdfFromTemplate / replaceAllPlaceholders_ / exportDocAsPdfBlob_）
+- `placeholder-service` — 2026-05-27
+  `src/services/placeholderService.ts`: `{{key}}` 置換と和暦変換（令和/平成/昭和）・カンマ整形実装（buildLandPurchaseContractContext）
 
 ## skip リスト
 
@@ -36,4 +38,4 @@ today_commits_date: "2026-05-27"
 - 起動方式: 各実行は独立セッション。orchestrator.md と state.md から状態復元する
 - 安全ガード: 連続失敗3回 / 1日コミット30件 / paused=true で自動停止
 - Slack 通知方針: 厳しめ（種別 B/C は仕様書に書いてないことを推測しない、必ず Slack で確認）
-- 現状: document-generator Phase 1 ユーザー作業完了（2026-05-27）。Claude 実装タスク進行中（types 完了、sheetService 完了、templateService 完了、次は placeholderService）。
+- 現状: document-generator Phase 1 ユーザー作業完了（2026-05-27）。Claude 実装タスク進行中（types 完了、sheetService 完了、templateService 完了、placeholderService 完了、次は documentHandler）。
