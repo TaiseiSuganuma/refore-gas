@@ -4,7 +4,7 @@ current_task: null
 waiting_for: null
 last_run_date: "2026-05-27"
 consecutive_failures: 0
-today_commits: 0
+today_commits: 1
 today_commits_date: "2026-05-27"
 ---
 
@@ -12,7 +12,8 @@ today_commits_date: "2026-05-27"
 
 ## 完了タスク
 
-（自走ループ開始前。今後 Claude が自動で追加）
+- `clasp-json-sample-and-oauth-scopes` — 2026-05-27
+  `.clasp.json.sample` 作成・appsscript.json スコープ設定（documents, script.container.ui 追加）
 
 ## skip リスト
 
@@ -29,6 +30,4 @@ today_commits_date: "2026-05-27"
 - 起動方式: 各実行は独立セッション。orchestrator.md と state.md から状態復元する
 - 安全ガード: 連続失敗3回 / 1日コミット30件 / paused=true で自動停止
 - Slack 通知方針: 厳しめ（種別 B/C は仕様書に書いてないことを推測しない、必ず Slack で確認）
-- 現状: document-generator Phase 1 はユーザー作業待ち。その間、自動化ループは
-  「ユーザー作業ではなく、かつ Claude が自走可能」なタスク（モノレポ横断のインフラ系など）を探す。
-  該当タスクが無ければ毎時起動して即終了する状態が続く（正常動作）
+- 現状: document-generator Phase 1 ユーザー作業完了（2026-05-27）。Claude 実装タスク着手中。
