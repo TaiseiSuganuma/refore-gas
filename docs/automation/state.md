@@ -4,7 +4,7 @@ current_task: null
 waiting_for: null
 last_run_date: "2026-05-27"
 consecutive_failures: 0
-today_commits: 1
+today_commits: 2
 today_commits_date: "2026-05-27"
 ---
 
@@ -14,6 +14,8 @@ today_commits_date: "2026-05-27"
 
 - `clasp-json-sample-and-oauth-scopes` — 2026-05-27
   `.clasp.json.sample` 作成・appsscript.json スコープ設定（documents, script.container.ui 追加）
+- `types-contract-context` — 2026-05-27
+  `src/types/index.ts`: CaseRow / PropertyRow / Settings / LandPurchaseContractContext 等の型定義（Phase 1 MVP 向け）
 
 ## skip リスト
 
@@ -30,4 +32,4 @@ today_commits_date: "2026-05-27"
 - 起動方式: 各実行は独立セッション。orchestrator.md と state.md から状態復元する
 - 安全ガード: 連続失敗3回 / 1日コミット30件 / paused=true で自動停止
 - Slack 通知方針: 厳しめ（種別 B/C は仕様書に書いてないことを推測しない、必ず Slack で確認）
-- 現状: document-generator Phase 1 ユーザー作業完了（2026-05-27）。Claude 実装タスク着手中。
+- 現状: document-generator Phase 1 ユーザー作業完了（2026-05-27）。Claude 実装タスク進行中（types 完了、次は sheetService）。
