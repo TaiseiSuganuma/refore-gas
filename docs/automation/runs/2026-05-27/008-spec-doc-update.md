@@ -31,7 +31,7 @@ document-generator
 - `package-lock.json`: TypeScript 5.4.5 ロック
 
 ## コミット
-- （コミット後に記入）
+- 04745d0 D(document-generator): spec-doc-update — 仕様書 § 11 実装ファイル一覧の更新 + TypeScript バージョン固定
 
 ## Slack 通知
 完了報告を投稿
