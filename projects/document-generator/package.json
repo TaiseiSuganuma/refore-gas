@@ -5,12 +5,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/appsscript.json dist/appsscript.json",
-    "push": "npm run build && clasp push --force",
-    "pull": "clasp pull",
-    "open": "clasp open",
-    "deploy": "npm run build && clasp deploy",
-    "logs": "clasp logs",
-    "login": "clasp login"
+    "push": "npm run build && /opt/homebrew/bin/clasp push --force",
+    "pull": "/opt/homebrew/bin/clasp pull",
+    "open": "/opt/homebrew/bin/clasp open",
+    "deploy": "npm run build && /opt/homebrew/bin/clasp deploy",
+    "logs": "/opt/homebrew/bin/clasp logs",
+    "login": "/opt/homebrew/bin/clasp login"
   },
   "devDependencies": {
     "@google/clasp": "^2.4.2",

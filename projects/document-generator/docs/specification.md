@@ -337,32 +337,35 @@ Drive/
 
 ## 11. 関連ファイル一覧
 
-### Phase 1 実装済み
-
-| ファイル | 役割 |
-|---|---|
-| `src/Code.ts` | GAS グローバル関数（onOpen, generateLandPurchaseContract, doGet, doPost） |
-| `src/types/index.ts` | 型定義（CaseRow, PropertyRow, Settings, LandPurchaseContractContext, DocumentGenerationResult 等） |
-| `src/handlers/documentHandler.ts` | 単発書類生成オーケストレーション（設定取得 → アクティブ行取得 → 物件行取得 → プレースホルダ生成 → PDF 出力）（Phase 1） |
-| `src/handlers/webAppHandler.ts` | doGet / doPost Web App スタブ（将来の API エンドポイント用） |
-| `src/services/sheetService.ts` | 案件一覧・物件・設定シートの読み込み（getSettings / getActiveCaseRow / getPropertyRowsByCaseId 等）（Phase 1） |
-| `src/services/templateService.ts` | Docs テンプレ複製・プレースホルダ一括置換・PDF 化（generatePdfFromTemplate）（Phase 1） |
-| `src/services/placeholderService.ts` | `{{key}}` 置換・和暦変換・カンマ整形（buildLandPurchaseContractContext）（Phase 1） |
-| `src/utils/logger.ts` | `Logger_` 名前空間（info / warn / error → Stackdriver console）（Phase 1） |
-| `src/appsscript.json` | GAS マニフェスト（OAuth スコープ: spreadsheets, drive, documents, script.container.ui） |
-
-### Phase 2〜 予定（未実装）
+### Phase 1 + Phase 2 実装済み
 
 | ファイル | 役割 | 追加 Phase |
 |---|---|---|
-| `src/dialog.html` | バッチ実行結果ダイアログ（成功件数・失敗件数・詳細リスト） | Phase 2 |
-| `src/handlers/batchHandler.ts` | 複数案件×複数書類のバッチ処理 | Phase 2 |
-| `src/handlers/onEditHandler.ts` | パターン選択時の書類列初期チェック投入 | Phase 2 |
-| `src/handlers/onFormSubmitHandler.ts` | フォーム送信トリガー処理 | Phase 4 |
-| `src/services/documentMasterService.ts` | 「出力書類リスト」シート読み込み | Phase 2 |
-| `src/services/projectFolderService.ts` | 案件フォルダ作成・URL 管理（`案件/YYYY/MM/<案件ID>_<地域>_<相手方名>/`） | Phase 2 |
-| `src/services/patternResolver.ts` | パターン（A①/A②等） → 必要書類セット判定 | Phase 2 |
+| `src/Code.ts` | GAS グローバル関数（onOpen, generateLandPurchaseContract, generateBatchDocuments, onEdit, doGet, doPost） | Phase 1 → Phase 2 でメニュー＋onEdit 追加 |
+| `src/types/index.ts` | 型定義（CaseRow, PropertyRow, Settings, LandPurchaseContractContext, DocumentMasterRow, PartnerRow, AgentRow, BatchResult 等） | Phase 1 → Phase 2 拡張 |
+| `src/handlers/documentHandler.ts` | 単発書類生成オーケストレーション（土地売買契約書のみ） | Phase 1 |
+| `src/handlers/batchHandler.ts` | 複数案件×複数書類のバッチ処理（書類マスタの「有効」=TRUE 書類のみ） | Phase 2 |
+| `src/handlers/onEditHandler.ts` | 案件パターン編集時に書類列の初期チェック投入 | Phase 2 |
+| `src/handlers/webAppHandler.ts` | doGet / doPost Web App スタブ（将来の API エンドポイント用） | Phase 1 |
+| `src/services/sheetService.ts` | 案件一覧・物件・設定シート読み書き（getSettings / getActiveCaseRow / getPropertyRowsByCaseId / getSelectedCaseRows / updateCaseRowStatus / getCheckedDocumentNames 等） | Phase 1 → Phase 2 拡張 |
+| `src/services/templateService.ts` | Docs テンプレ複製・プレースホルダ一括置換・PDF 化（generatePdfFromTemplate / generatePdfToFolder） | Phase 1 → Phase 2 で `generatePdfToFolder` 追加 |
+| `src/services/placeholderService.ts` | `{{key}}` 置換・和暦変換・カンマ整形（buildLandPurchaseContractContext） | Phase 1 |
+| `src/services/documentMasterService.ts` | 書類マスタ読み込み（findByName / getEnabledRowById / getMatchingDocuments / extractFileIdFromUrl） | Phase 2 |
+| `src/services/partnerMasterService.ts` | 取引先マスタ読み込み（getById） | Phase 2 |
+| `src/services/agentMasterService.ts` | 代理人マスタ読み込み（getById） | Phase 2（利用は Phase 3 から） |
+| `src/services/projectFolderService.ts` | 案件フォルダ自動作成（`案件/YYYY/MM/<案件ID>_<地域>_<相手方名>/`） | Phase 2 |
 | `src/services/versionedNameService.ts` | 同名 PDF に `_v2`, `_v3` ... を付与 | Phase 2 |
+| `src/utils/logger.ts` | `Logger_` 名前空間（info / warn / error → Stackdriver console） | Phase 1 |
+| `src/appsscript.json` | GAS マニフェスト（OAuth スコープ: spreadsheets, drive, documents, script.container.ui） | Phase 1 |
+
+### Phase 3〜 予定（未実装）
+
+| ファイル | 役割 | 追加 Phase |
+|---|---|---|
+| `src/dialog.html` | バッチ実行結果ダイアログ（現状は SpreadsheetApp.getUi().alert で代用） | Phase 3 で必要に応じて |
+| `src/handlers/onFormSubmitHandler.ts` | フォーム送信トリガー処理 | Phase 4 |
+| 各書類別 Context ビルダー（placeholderService 拡張） | A①/A②/B①/B² 契約書・法務局 5 書類の Context 生成 | Phase 3 |
+| 繰返し処理（`{{#each items}}`）対応 | 物件明細を表として差し込み | Phase 3 |
 
 ---
 

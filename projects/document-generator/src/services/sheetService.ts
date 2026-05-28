@@ -95,7 +95,7 @@ namespace SheetService {
     // 必須キーの存在確認（警告ログ）
     const requiredKeys: Array<keyof Settings> = [
       "Phase1テンプレID_土地売買契約書",
-      "Phase1出力先フォルダID",
+      "共通PDF出力先親フォルダID",
       "物件シート名",
       "案件一覧シート名",
     ];
@@ -114,7 +114,7 @@ namespace SheetService {
       物件シート名: map["物件シート名"] ?? "物件",
       Phase1テンプレID_土地売買契約書:
         map["Phase1テンプレID_土地売買契約書"] ?? "",
-      Phase1出力先フォルダID: map["Phase1出力先フォルダID"] ?? "",
+      共通PDF出力先親フォルダID: map["共通PDF出力先親フォルダID"] ?? "",
       ...map,
     } as Settings;
   }
@@ -238,8 +238,156 @@ namespace SheetService {
     );
 
     // 物件No 順でソート (master-sheet-schema.md § 3「B列: 物件No 案件内の連番」)
-    filtered.sort((a, b) => Number(a.物件No) - Number(b.物件No));
+    // 物件シートは旧「土地No」列名で運用されているため、両方を見る
+    filtered.sort((a, b) => {
+      const aNo = Number(a.物件No ?? (a as unknown as SheetRow)["土地No"]);
+      const bNo = Number(b.物件No ?? (b as unknown as SheetRow)["土地No"]);
+      return aNo - bNo;
+    });
 
     return filtered;
+  }
+
+  // ----------------------------------------------------------
+  // Phase 2: バッチ処理用 — 選択行抽出・ステータス更新
+  // 根拠: master-sheet-schema.md § 2「Phase 2 段階」「行頭選択チェックボックス」
+  //       specification.md § 3「Phase 2 詳細」「行頭チェック ON の案件を抽出」
+  // ----------------------------------------------------------
+
+  /**
+   * 案件一覧シートのヘッダー → 列番号 (1-based) のマップを返す。
+   * setValue() / updateStatus() で列番号を指定するために必要。
+   */
+  export function getHeaderColumnMap(
+    sheet: GoogleAppsScript.Spreadsheet.Sheet
+  ): { [header: string]: number } {
+    const lastCol = sheet.getLastColumn();
+    if (lastCol === 0) return {};
+    const headers = sheet
+      .getRange(1, 1, 1, lastCol)
+      .getValues()[0] as string[];
+    const map: { [header: string]: number } = {};
+    headers.forEach((h, i) => {
+      const trimmed = String(h ?? "").trim();
+      if (trimmed) map[trimmed] = i + 1;
+    });
+    return map;
+  }
+
+  /**
+   * 案件一覧シートから「選択」列が TRUE の行（CaseRow + 行番号）を返す。
+   *
+   * 根拠: master-sheet-schema.md § 2「A列: 選択（チェックボックス）」
+   *       specification.md § 3「Phase 2 詳細」「行頭チェック ON の案件を抽出」
+   *
+   * @param ss          スプレッドシート
+   * @param sheetName   案件一覧シート名
+   * @param selectionColumnName  選択列名（設定シートから渡す、デフォルト "選択"）
+   * @returns 選択された案件行と、その行番号（1-based、ヘッダー含む）
+   */
+  export function getSelectedCaseRows(
+    ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
+    sheetName: string,
+    selectionColumnName: string = "選択"
+  ): Array<{ row: CaseRow; rowNumber: number }> {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      throw new Error(`案件一覧シート "${sheetName}" が見つかりません`);
+    }
+
+    const all = getAllRows(sheet);
+    if (all.length < 2) return [];
+
+    const headers = all[0] as string[];
+    const selectionIdx = headers.findIndex(
+      (h) => String(h ?? "").trim() === selectionColumnName
+    );
+    if (selectionIdx < 0) {
+      Logger_.warn(
+        `getSelectedCaseRows: 案件一覧シートに「${selectionColumnName}」列が見つかりません`
+      );
+      return [];
+    }
+
+    const results: Array<{ row: CaseRow; rowNumber: number }> = [];
+    for (let i = 1; i < all.length; i++) {
+      const row = all[i];
+      const isSelected = row[selectionIdx] === true;
+      if (!isSelected) continue;
+
+      // 案件 ID が空の行はスキップ
+      const caseIdIdx = headers.findIndex(
+        (h) => String(h ?? "").trim() === "案件ID"
+      );
+      if (caseIdIdx < 0 || !String(row[caseIdIdx] ?? "").trim()) continue;
+
+      const record: SheetRow = {};
+      headers.forEach((h, idx) => {
+        record[h] = row[idx] as string | number | boolean | Date;
+      });
+      results.push({
+        row: record as unknown as CaseRow,
+        rowNumber: i + 1, // 1-based、ヘッダー含む
+      });
+    }
+    return results;
+  }
+
+  /**
+   * 案件一覧シートの 1 行に対して、ステータス・フォルダURL・最終出力日時を更新する。
+   *
+   * 根拠: master-sheet-schema.md § 2 Phase 2 段階
+   *       「ステータス」「フォルダURL」「最終出力日時」列
+   *       specification.md § 4.3「ステータス遷移」(出力済みの自動セット)
+   *
+   * @param sheet        案件一覧シート
+   * @param rowNumber    更新対象行番号 (1-based、ヘッダー含む)
+   * @param status       ステータス値 (例: "出力済み")
+   * @param folderUrl    フォルダURL (空文字なら更新しない)
+   * @param updatedAt    最終出力日時 (Date)
+   */
+  export function updateCaseRowStatus(
+    sheet: GoogleAppsScript.Spreadsheet.Sheet,
+    rowNumber: number,
+    status: string,
+    folderUrl: string,
+    updatedAt: Date
+  ): void {
+    const colMap = getHeaderColumnMap(sheet);
+
+    const statusCol = colMap["ステータス"];
+    const folderUrlCol = colMap["フォルダURL"];
+    const updatedAtCol = colMap["最終出力日時"];
+
+    if (statusCol) {
+      sheet.getRange(rowNumber, statusCol).setValue(status);
+    }
+    if (folderUrlCol && folderUrl) {
+      sheet.getRange(rowNumber, folderUrlCol).setValue(folderUrl);
+    }
+    if (updatedAtCol) {
+      sheet.getRange(rowNumber, updatedAtCol).setValue(updatedAt);
+    }
+  }
+
+  /**
+   * CaseRow に対して書類列（「書類_<書類名>」形式）が ON の書類名一覧を抽出する。
+   *
+   * 根拠: master-sheet-schema.md § 2「Group 4: 書類選択チェックボックス（14 列）」
+   *       案件一覧の AA〜AN 列が `書類_土地売買契約書` 〜 `書類_法務局_X5`
+   *
+   * @param caseRow CaseRow（SheetRow として読み込み済み）
+   * @returns ON になっている書類列の suffix（書類マスタの「書類名」と一致）
+   */
+  export function getCheckedDocumentNames(caseRow: CaseRow): string[] {
+    const record = caseRow as unknown as SheetRow;
+    const result: string[] = [];
+    for (const key of Object.keys(record)) {
+      if (!key.startsWith("書類_")) continue;
+      if (record[key] === true) {
+        result.push(key.replace(/^書類_/, ""));
+      }
+    }
+    return result;
   }
 }

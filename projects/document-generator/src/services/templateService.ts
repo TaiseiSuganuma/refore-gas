@@ -63,6 +63,36 @@ namespace TemplateService {
     // 出力先フォルダを取得
     const outputFolder = DriveApp.getFolderById(outputFolderId);
 
+    return generatePdfToFolder(
+      templateDocId,
+      outputFolder,
+      pdfFileName,
+      replacements
+    );
+  }
+
+  /**
+   * Phase 2 用 — 出力先 Folder と PDF ファイル名を呼び出し側から指定できる版。
+   *
+   * Phase 2 では batchHandler が ProjectFolderService で案件フォルダを生成し、
+   * VersionedNameService で衝突回避済みのファイル名を組み立てた上でこれを呼ぶ。
+   *
+   * @param templateDocId  プレースホルダ挿入済みテンプレ Docs ID
+   * @param outputFolder   出力先 Folder（既に取得済みの DriveApp.Folder）
+   * @param pdfFileName    PDF ファイル名（拡張子 .pdf 込み、衝突回避済み）
+   * @param replacements   プレースホルダ置換マップ
+   * @returns 保存された PDF の DriveFile
+   */
+  export function generatePdfToFolder(
+    templateDocId: string,
+    outputFolder: GoogleAppsScript.Drive.Folder,
+    pdfFileName: string,
+    replacements: PlaceholderContext
+  ): GoogleAppsScript.Drive.File {
+    Logger_.info(
+      `[TemplateService] PDF 生成: ${pdfFileName} → フォルダ ${outputFolder.getName()}`
+    );
+
     // テンプレを複製（一時コピー）
     const originalFile = DriveApp.getFileById(templateDocId);
     const tempCopyName = `[一時コピー]_${pdfFileName}`;
@@ -80,7 +110,6 @@ namespace TemplateService {
       tempDoc.saveAndClose();
 
       // PDF 化して出力先フォルダに保存
-      // 根拠: GAS の Drive Advanced Service を使わず DriveApp で取得した Blob を利用
       const pdfBlob = exportDocAsPdfBlob_(tempCopy.getId(), pdfFileName);
       const pdfFile = outputFolder.createFile(pdfBlob);
 
@@ -200,6 +229,10 @@ namespace TemplateService {
    * @param date 変換対象の Date
    * @returns "YYYYMMDD" 形式の文字列
    */
+  export function formatDateToYYYYMMDD(date: Date): string {
+    return formatDateToYYYYMMDD_(date);
+  }
+
   function formatDateToYYYYMMDD_(date: Date): string {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");

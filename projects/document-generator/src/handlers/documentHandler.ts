@@ -66,7 +66,7 @@ namespace DocumentHandler {
     // テンプレ ID と出力フォルダ ID の存在確認
     // 根拠: specification.md § 8「マスタに必須値が無い → 該当案件のみスキップ + ログに警告」
     const templateDocId = settings.Phase1テンプレID_土地売買契約書;
-    const outputFolderId = settings.Phase1出力先フォルダID;
+    const outputFolderId = settings.共通PDF出力先親フォルダID;
 
     if (!templateDocId) {
       const msg =
@@ -83,7 +83,7 @@ namespace DocumentHandler {
 
     if (!outputFolderId) {
       const msg =
-        '設定シートに "Phase1出力先フォルダID" が設定されていません。設定シートを確認してください。';
+        '設定シートに "共通PDF出力先親フォルダID" が設定されていません。設定シートを確認してください。';
       Logger_.error(`[DocumentHandler] ${msg}`);
       showErrorAlert_(msg);
       return {
