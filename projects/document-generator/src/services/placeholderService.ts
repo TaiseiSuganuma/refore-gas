@@ -344,4 +344,356 @@ namespace PlaceholderService {
       }
     }
   }
+
+  // ============================================================
+  // Phase 3: 各書類別 Context ビルダー
+  // ============================================================
+
+  /**
+   * 物件行から PropertyItem 配列を組み立てる（繰返し展開用）。
+   * 根拠: documents/legal_documents_placeholders.md「不動産の表示（繰返し処理 Phase 3）」
+   */
+  export function buildPropertyItems(
+    propertyRows: PropertyRow[]
+  ): PropertyItem[] {
+    return propertyRows.map((row) => {
+      const sr = row as unknown as SheetRow;
+      const noRaw =
+        sr["物件No"] ?? sr["土地No"] ?? "";
+      const areaNum = parseNumber_(sr["面積(㎡)"]);
+      const 地積Str = areaNum > 0 ? formatNumberWithCommas_(areaNum) : "";
+      return {
+        物件No: String(noRaw ?? "").trim(),
+        所在: String(sr["所在"] ?? "").trim(),
+        地番: String(sr["地番"] ?? "").trim(),
+        地目: String(sr["地目"] ?? "").trim(),
+        地積: 地積Str,
+        不動産番号: String(sr["不動産番号"] ?? "").trim(),
+      };
+    });
+  }
+
+  /**
+   * 物件行から「全筆まとめ表示」を組み立てる（例: 南さつま市加世田内山田10647-1, 10510-1, 10510-2）。
+   * 根拠: documents/legal_documents_placeholders.md「{{不動産表示_全筆}}」
+   */
+  export function buildAllPropertyDisplay(
+    propertyRows: PropertyRow[]
+  ): string {
+    if (propertyRows.length === 0) return "";
+    const seenAddresses: { [key: string]: boolean } = {};
+    const parts: string[] = [];
+    for (const row of propertyRows) {
+      const sr = row as unknown as SheetRow;
+      const 所在 = String(sr["所在"] ?? "").trim();
+      const 地番 = String(sr["地番"] ?? "").trim();
+      if (!所在 || !地番) continue;
+      const key = `${所在}${地番}`;
+      if (seenAddresses[key]) continue;
+      seenAddresses[key] = true;
+      parts.push(key);
+    }
+    return parts.join(", ");
+  }
+
+  // ----------------------------------------------------------
+  // A② 立木付土地売買契約書
+  // 根拠: documents/purchase_contract_land_tree_placeholders.md
+  //   土地売買契約書（A③）から「売買金額」→「売買金額合計/土地代金/立木代金」に分岐
+  //   物件シートから 立木代金 = 全物件「金額(円)」の合計（税抜）として算出
+  //   土地代金 = 案件マスタ「売買金額」（A② では土地代金として運用）
+  //   売買金額合計 = 土地代金 + round(立木代金 * 1.1)
+  // ----------------------------------------------------------
+  export function buildLandTreeContractContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[]
+  ): PlaceholderContext {
+    const base = buildLandPurchaseContractContext(caseRow, propertyRows);
+
+    // 立木代金 = 物件シートの「金額(円)」合計（A② では物件シート＝立木明細の前提）
+    const 立木代金Num = propertyRows.reduce(
+      (sum, row) => sum + parseNumber_((row as unknown as SheetRow)["金額(円)"]),
+      0
+    );
+    const 土地代金Num = parseNumber_(caseRow["見積金額(円)"]);
+    const 売買金額合計Num = 土地代金Num + Math.round(立木代金Num * 1.1);
+
+    return {
+      ...base,
+      売買金額: "", // A② テンプレでは未使用（合計に統合）
+      売買金額合計: formatNumberWithCommas_(売買金額合計Num),
+      土地代金: formatNumberWithCommas_(土地代金Num),
+      立木代金: formatNumberWithCommas_(立木代金Num),
+    };
+  }
+
+  // ----------------------------------------------------------
+  // A① 立木売買契約書
+  // 根拠: documents/purchase_contract_tree_placeholders.md
+  //   土地売買契約書（A③）と同形式。{{売買金額}} は「消費税込」表記
+  //   物件シートの「金額(円)」合計（×1.1）を消費税込として入れる
+  // ----------------------------------------------------------
+  export function buildTreeContractContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[]
+  ): PlaceholderContext {
+    const base = buildLandPurchaseContractContext(caseRow, propertyRows);
+
+    // A① の {{売買金額}} は税込。物件合計金額（税抜）×1.1 を採用
+    const 物件合計税抜 = propertyRows.reduce(
+      (sum, row) => sum + parseNumber_((row as unknown as SheetRow)["金額(円)"]),
+      0
+    );
+    // 案件マスタの「売買金額」(税込) が入っていればそちらを優先
+    const 案件売買金額Num = parseNumber_(caseRow["見積金額(円)"]);
+    const 売買金額Num =
+      案件売買金額Num > 0
+        ? 案件売買金額Num
+        : Math.round(物件合計税抜 * 1.1);
+
+    return {
+      ...base,
+      売買金額: formatNumberWithCommas_(売買金額Num),
+    };
+  }
+
+  // ----------------------------------------------------------
+  // B② お客様契約書_土地込
+  // 根拠: documents/customer_contract_land_placeholders.md
+  //   売主 = リフォレ（固定）、買主 = 取引先マスタ参照
+  //   物件シートからの集計（代表所在・代表面積・合計面積など）
+  //   B 系統では物件シートに依存しない金額内訳が必要（ユーザー判断: 売買金額をそのまま合計に）
+  // ----------------------------------------------------------
+  export function buildCustomerLandContractContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[],
+    buyer: PartnerRow | null
+  ): PlaceholderContext {
+    // 物件サマリ
+    const firstProp = propertyRows[0];
+    const sr0 = firstProp ? (firstProp as unknown as SheetRow) : null;
+    const 代表所在 = sr0
+      ? `${String(sr0["所在"] ?? "").trim()}${String(sr0["地番"] ?? "").trim()}`
+      : "";
+    const 代表面積Num = sr0 ? parseNumber_(sr0["面積(㎡)"]) : 0;
+
+    const 筆数Num = propertyRows.length;
+    const 他筆数 = 筆数Num > 0 ? Math.max(0, 筆数Num - 1) : 0;
+    const 合計面積Num = propertyRows.reduce(
+      (sum, row) => sum + parseNumber_((row as unknown as SheetRow)["面積(㎡)"]),
+      0
+    );
+    const 合計雑抜きNum = propertyRows.reduce(
+      (sum, row) => sum + parseNumber_((row as unknown as SheetRow)["雑抜き(㎡)"]),
+      0
+    );
+
+    // 金額: B 系統では物件シート以外と案件マスタだけで組み立てる方針
+    //   売買金額合計 = 案件マスタ「売買金額」（税込）
+    //   山林金額/土地金額の内訳は Phase 3 では空のまま（人間が手で調整）
+    const 売買金額合計Num = parseNumber_(caseRow["見積金額(円)"]);
+
+    const ctx: PlaceholderContext = {
+      ...buildCommonDateContext_(caseRow),
+
+      代表所在,
+      代表面積: 代表面積Num > 0 ? formatNumberWithCommas_(代表面積Num) : "",
+      他筆数: String(他筆数),
+      筆数: String(筆数Num),
+      合計面積: 合計面積Num > 0 ? formatNumberWithCommas_(合計面積Num) : "",
+      合計雑抜き: 合計雑抜きNum > 0 ? formatNumberWithCommas_(合計雑抜きNum) : "",
+      売買金額合計: formatNumberWithCommas_(売買金額合計Num),
+      消費税合計: "",
+      山林金額: "",
+      山林消費税: "",
+      土地金額: "",
+
+      買主会社名: buyer ? buyer.会社名 : "",
+      買主代表者名: buyer ? buyer.代表者名 : "",
+      買主住所: buyer ? buyer.住所 : "",
+      買主登録番号: buyer ? buyer.登録番号 : "",
+    };
+
+    // 別紙繰返し用（地番リスト）
+    (ctx as unknown as RepeatableContext).items = buildPropertyItems(
+      propertyRows
+    ).map((p) => ({
+      物件No: p.物件No,
+      所在: p.所在,
+      地番: p.地番,
+    }));
+
+    return ctx;
+  }
+
+  // ----------------------------------------------------------
+  // B① お客様契約書_立木
+  // 根拠: documents/customer_contract_tree_placeholders.md
+  //   B② と同じプレースホルダセット（テンプレ名「土地別」だがレイアウトは同じ）
+  // ----------------------------------------------------------
+  export function buildCustomerTreeContractContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[],
+    buyer: PartnerRow | null
+  ): PlaceholderContext {
+    return buildCustomerLandContractContext(caseRow, propertyRows, buyer);
+  }
+
+  // ----------------------------------------------------------
+  // 法務局書類共通の Context 構築
+  // 根拠: documents/legal_documents_placeholders.md「プレースホルダ一覧（サマリー）」
+  // ----------------------------------------------------------
+
+  /**
+   * 法務局書類で共通の Context を組み立てる。
+   * 売主・買主・代理人・契約日・書類作成日・法務局支局・不動産表示など。
+   */
+  function buildLegalCommonContext_(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[],
+    buyer: PartnerRow | null,
+    agent: AgentRow | null
+  ): PlaceholderContext {
+    const sr = caseRow as unknown as SheetRow;
+    const 契約日_和暦 = toJapaneseEra_(caseRow.契約日);
+    const 書類作成日_和暦 = toJapaneseEra_(new Date());
+    const 住所変更日Raw = sr["住所変更日"];
+    const 住所変更日_和暦 =
+      住所変更日Raw instanceof Date || typeof 住所変更日Raw === "string"
+        ? toJapaneseEra_(住所変更日Raw)
+        : "";
+
+    return {
+      契約日_和暦,
+      書類作成日_和暦,
+      住所変更日_和暦,
+      売主氏名: String(caseRow.宛名 ?? "").trim(),
+      売主住所: String(caseRow.住所 ?? "").trim(),
+      売主連絡先: String(caseRow.TEL ?? "").trim(),
+      売主生年月日: String(sr["売主生年月日"] ?? "").trim(),
+      売主旧住所: String(sr["売主旧住所"] ?? "").trim(),
+      売主新住所: String(sr["売主新住所"] ?? "").trim(),
+      委任者住所: String(sr["売主旧住所"] ?? caseRow.住所 ?? "").trim(),
+      委任者氏名: String(caseRow.宛名 ?? "").trim(),
+      買主会社名: buyer ? buyer.会社名 : "",
+      買主住所: buyer ? buyer.住所 : "",
+      代理人氏名: agent ? agent.氏名 : "",
+      代理人住所: agent ? agent.住所 : "",
+      法務局支局: String(sr["法務局支局"] ?? "").trim(),
+      不動産表示_全筆: buildAllPropertyDisplay(propertyRows),
+    };
+  }
+
+  // ----------------------------------------------------------
+  // 法務局: 登記原因証明情報
+  // 根拠: documents/legal_documents_placeholders.md § 1
+  // ----------------------------------------------------------
+  export function buildLegalTransferReasonContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[],
+    buyer: PartnerRow | null,
+    agent: AgentRow | null
+  ): PlaceholderContext {
+    return buildLegalCommonContext_(caseRow, propertyRows, buyer, agent);
+  }
+
+  // ----------------------------------------------------------
+  // 法務局: 所有権移転委任状
+  // 根拠: documents/legal_documents_placeholders.md § 2
+  // ----------------------------------------------------------
+  export function buildLegalTransferProxyContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[],
+    buyer: PartnerRow | null,
+    agent: AgentRow | null
+  ): PlaceholderContext {
+    return buildLegalCommonContext_(caseRow, propertyRows, buyer, agent);
+  }
+
+  // ----------------------------------------------------------
+  // 法務局: 登記住所変更委任状
+  // 根拠: documents/legal_documents_placeholders.md § 3
+  // ----------------------------------------------------------
+  export function buildLegalAddressProxyContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[],
+    buyer: PartnerRow | null,
+    agent: AgentRow | null
+  ): PlaceholderContext {
+    return buildLegalCommonContext_(caseRow, propertyRows, buyer, agent);
+  }
+
+  // ----------------------------------------------------------
+  // 法務局: 登記申請書 (権利書あり / 権利書なし)
+  // 根拠: documents/legal_documents_placeholders.md § 4
+  //   不動産表示は繰返し（物件シートから items 配列で渡す）
+  //   課税価格 = 土地代金（案件マスタ「売買金額」）
+  //   登録免許税 = 課税価格 × 0.02（ユーザー判断: 土地代金 × 2%）
+  //   権利書なしは {{権利書がない理由}} を追加
+  // ----------------------------------------------------------
+  export function buildLegalTransferApplicationContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[],
+    buyer: PartnerRow | null,
+    agent: AgentRow | null,
+    options: { withoutRightDoc?: boolean; reason?: string } = {}
+  ): PlaceholderContext {
+    const base = buildLegalCommonContext_(caseRow, propertyRows, buyer, agent);
+    const 課税価格Num = parseNumber_(caseRow["見積金額(円)"]);
+    const 登録免許税Num = Math.floor(課税価格Num * 0.02);
+
+    const ctx: PlaceholderContext = {
+      ...base,
+      課税価格: formatNumberWithCommas_(課税価格Num),
+      登録免許税: formatNumberWithCommas_(登録免許税Num),
+    };
+
+    // 物件繰返し
+    (ctx as unknown as RepeatableContext).items = buildPropertyItems(
+      propertyRows
+    ) as unknown as Array<{ [key: string]: string }>;
+
+    // 権利書なしの場合のみ「権利書がない理由」を入れる
+    if (options.withoutRightDoc) {
+      ctx["権利書がない理由"] = options.reason ?? "";
+    }
+
+    return ctx;
+  }
+
+  // ----------------------------------------------------------
+  // 法務局: 登記住所変更登記申請書
+  // 根拠: documents/legal_documents_placeholders.md § 5
+  //   登録免許税_住所変更 = 不動産 1 筆につき 1,000 円
+  // ----------------------------------------------------------
+  export function buildLegalAddressApplicationContext(
+    caseRow: CaseRow,
+    propertyRows: PropertyRow[],
+    buyer: PartnerRow | null,
+    agent: AgentRow | null
+  ): PlaceholderContext {
+    const base = buildLegalCommonContext_(caseRow, propertyRows, buyer, agent);
+    const 筆数 = propertyRows.length;
+    const 登録免許税_住所変更Num = 筆数 * 1000;
+
+    const ctx: PlaceholderContext = {
+      ...base,
+      登録免許税_住所変更: formatNumberWithCommas_(登録免許税_住所変更Num),
+    };
+
+    (ctx as unknown as RepeatableContext).items = buildPropertyItems(
+      propertyRows
+    ) as unknown as Array<{ [key: string]: string }>;
+
+    return ctx;
+  }
+
+  // ----------------------------------------------------------
+  // 共通日付 Context（B 系統契約書用）
+  // ----------------------------------------------------------
+  function buildCommonDateContext_(caseRow: CaseRow): PlaceholderContext {
+    return {
+      契約日: toJapaneseEra_(caseRow.契約日),
+    };
+  }
 }

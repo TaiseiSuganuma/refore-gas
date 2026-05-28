@@ -60,17 +60,28 @@ Google Docs テンプレート内に書く差し込み記法のルール。
 
 ---
 
-## 3. 繰返し（Phase 3 で実装）
+## 3. 繰返し（Phase 3 で実装済み）
 
 ```
-{{#each guarantors}}
-保証人: {{name}} （住所: {{address}}）
+{{#each items}}
+{{物件No}}.  {{所在}} {{地番}}
 {{/each}}
 ```
 
-- リストの渡し方は **TBD**
-  - 案A: マスタシート内に「保証人」シートを別に作り、案件IDで紐付け
-  - 案B: 1セル内に区切り文字で複数の値を入れる
+実装ルール（templateService.expandRepeatBlocks_）:
+- 開始マーカー `{{#each items}}` と終了マーカー `{{/each}}` は **単独の段落** として書く（同段落内の他テキスト混在は非対応）
+- マーカー間の段落をテンプレートとして、`PlaceholderContext.items` 配列の各要素分だけ複製展開する
+- 各複製でブロック内の `{{key}}` を `items[i][key]` で置換
+- ネストはサポートしない
+- 装飾（太字・下線等）は引き継がない（Phase 3 ではプレーンテキスト前提）
+- `items` 未指定 or 空配列の場合はマーカーと本体を **削除** する（条件出力としても機能）
+
+データソース:
+- 法務局申請書の「不動産の表示」: 物件シートの 1 案件分（不動産番号 / 所在 / 地番 / 地目 / 地積）
+- お客様契約書の「別紙詳細」: 物件シートの 1 案件分（物件No / 所在 / 地番）
+
+詳細は [`documents/legal_documents_placeholders.md`](./documents/legal_documents_placeholders.md) および
+[`documents/customer_contract_land_placeholders.md`](./documents/customer_contract_land_placeholders.md) 参照。
 
 ---
 

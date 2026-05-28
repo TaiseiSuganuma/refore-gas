@@ -23,8 +23,19 @@ namespace BatchHandler {
   // 定数
   // ----------------------------------------------------------
 
-  /** Phase 1 で実装済みの書類 ID。これだけは特別扱いで土地売買契約書 Context を組み立てる */
+  /** Phase 1 で実装済みの書類 ID */
   const DOC_ID_LAND_PURCHASE_CONTRACT = "purchase_contract_land";
+  /** Phase 3 で追加した書類 ID */
+  const DOC_ID_LAND_TREE = "purchase_contract_land_tree";
+  const DOC_ID_TREE = "purchase_contract_tree";
+  const DOC_ID_CUSTOMER_LAND = "customer_contract_land";
+  const DOC_ID_CUSTOMER_TREE = "customer_contract_tree";
+  const DOC_ID_LEGAL_TRANSFER_REASON = "legal_transfer_reason";
+  const DOC_ID_LEGAL_TRANSFER_PROXY = "legal_transfer_proxy";
+  const DOC_ID_LEGAL_ADDRESS_PROXY = "legal_address_proxy";
+  const DOC_ID_LEGAL_TRANSFER_APP_WITH = "legal_transfer_application_with_rightdoc";
+  const DOC_ID_LEGAL_TRANSFER_APP_WITHOUT = "legal_transfer_application_without_rightdoc";
+  const DOC_ID_LEGAL_ADDRESS_APP = "legal_address_application";
 
   // ----------------------------------------------------------
   // パブリック API
@@ -321,8 +332,10 @@ namespace BatchHandler {
   /**
    * 書類 ID ごとに適切なプレースホルダ Context を組み立てる。
    *
-   * Phase 2 では `purchase_contract_land` のみ実装。
-   * Phase 3 着手時に各書類別のビルダー関数を追加していく。
+   * 根拠:
+   *   - Phase 2: purchase_contract_land のみ
+   *   - Phase 3: A①/A²/B¹/B² 4契約書 + 法務局 6書類を追加
+   *     買主情報は取引先マスタ、代理人情報は代理人マスタから ID 参照で引く
    */
   function buildContextForDocument_(
     ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
@@ -330,27 +343,131 @@ namespace BatchHandler {
     documentId: string,
     settings: Settings
   ): PlaceholderContext {
-    if (documentId === DOC_ID_LAND_PURCHASE_CONTRACT) {
-      const propertySheetName = settings.物件シート名;
-      const caseId = String(caseRow.案件ID ?? "").trim();
-      const propertyRows = SheetService.getPropertyRowsByCaseId(
-        ss,
-        propertySheetName,
-        caseId
-      );
-      const ctx = PlaceholderService.buildLandPurchaseContractContext(
-        caseRow,
-        propertyRows
-      );
-      return ctx as unknown as PlaceholderContext;
+    const propertySheetName = settings.物件シート名;
+    const caseId = String(caseRow.案件ID ?? "").trim();
+    const propertyRows = SheetService.getPropertyRowsByCaseId(
+      ss,
+      propertySheetName,
+      caseId
+    );
+
+    // B 系統 / 法務局書類で必要な取引先・代理人を ID 参照で引く
+    const sr = caseRow as unknown as SheetRow;
+    const buyerPartnerId = String(sr["買主取引先ID"] ?? "").trim();
+    const agentId = String(sr["代理人ID"] ?? "").trim();
+    const partnerSheetName =
+      settings["取引先マスタシート名"] || "取引先マスタ";
+    const agentSheetName =
+      settings["代理人マスタシート名"] || "代理人マスタ";
+
+    let buyer: PartnerRow | null = null;
+    if (buyerPartnerId) {
+      try {
+        buyer = PartnerMasterService.getById(ss, partnerSheetName, buyerPartnerId);
+      } catch (err) {
+        Logger_.warn(`[BatchHandler] 取引先マスタ読込失敗（継続）: ${err}`);
+      }
+    }
+    let agent: AgentRow | null = null;
+    if (agentId) {
+      try {
+        agent = AgentMasterService.getById(ss, agentSheetName, agentId);
+      } catch (err) {
+        Logger_.warn(`[BatchHandler] 代理人マスタ読込失敗（継続）: ${err}`);
+      }
     }
 
-    // Phase 3 着手時に各書類のビルダーを追加する。
-    // それまでは空 Context で PDF 出力（プレースホルダは未差し込みのまま残る）。
-    Logger_.warn(
-      `[BatchHandler] 書類ID "${documentId}" 用の Context ビルダーが未実装。空 Context で出力します。`
-    );
-    return {};
+    switch (documentId) {
+      case DOC_ID_LAND_PURCHASE_CONTRACT:
+        return PlaceholderService.buildLandPurchaseContractContext(
+          caseRow,
+          propertyRows
+        ) as unknown as PlaceholderContext;
+
+      case DOC_ID_LAND_TREE:
+        return PlaceholderService.buildLandTreeContractContext(
+          caseRow,
+          propertyRows
+        );
+
+      case DOC_ID_TREE:
+        return PlaceholderService.buildTreeContractContext(caseRow, propertyRows);
+
+      case DOC_ID_CUSTOMER_LAND:
+        return PlaceholderService.buildCustomerLandContractContext(
+          caseRow,
+          propertyRows,
+          buyer
+        );
+
+      case DOC_ID_CUSTOMER_TREE:
+        return PlaceholderService.buildCustomerTreeContractContext(
+          caseRow,
+          propertyRows,
+          buyer
+        );
+
+      case DOC_ID_LEGAL_TRANSFER_REASON:
+        return PlaceholderService.buildLegalTransferReasonContext(
+          caseRow,
+          propertyRows,
+          buyer,
+          agent
+        );
+
+      case DOC_ID_LEGAL_TRANSFER_PROXY:
+        return PlaceholderService.buildLegalTransferProxyContext(
+          caseRow,
+          propertyRows,
+          buyer,
+          agent
+        );
+
+      case DOC_ID_LEGAL_ADDRESS_PROXY:
+        return PlaceholderService.buildLegalAddressProxyContext(
+          caseRow,
+          propertyRows,
+          buyer,
+          agent
+        );
+
+      case DOC_ID_LEGAL_TRANSFER_APP_WITH:
+        return PlaceholderService.buildLegalTransferApplicationContext(
+          caseRow,
+          propertyRows,
+          buyer,
+          agent,
+          { withoutRightDoc: false }
+        );
+
+      case DOC_ID_LEGAL_TRANSFER_APP_WITHOUT:
+        return PlaceholderService.buildLegalTransferApplicationContext(
+          caseRow,
+          propertyRows,
+          buyer,
+          agent,
+          {
+            withoutRightDoc: true,
+            // 「権利書がない理由」は案件マスタにまだ列がないため空運用。
+            // 将来必要になれば案件マスタへ列追加を検討（specification.md § 12 で履歴化）。
+            reason: String(sr["権利書がない理由"] ?? "").trim(),
+          }
+        );
+
+      case DOC_ID_LEGAL_ADDRESS_APP:
+        return PlaceholderService.buildLegalAddressApplicationContext(
+          caseRow,
+          propertyRows,
+          buyer,
+          agent
+        );
+
+      default:
+        Logger_.warn(
+          `[BatchHandler] 書類ID "${documentId}" 用の Context ビルダーが未実装。空 Context で出力します。`
+        );
+        return {};
+    }
   }
 
   /**

@@ -337,19 +337,19 @@ Drive/
 
 ## 11. 関連ファイル一覧
 
-### Phase 1 + Phase 2 実装済み
+### Phase 1〜3 実装済み
 
 | ファイル | 役割 | 追加 Phase |
 |---|---|---|
 | `src/Code.ts` | GAS グローバル関数（onOpen, generateLandPurchaseContract, generateBatchDocuments, onEdit, doGet, doPost） | Phase 1 → Phase 2 でメニュー＋onEdit 追加 |
 | `src/types/index.ts` | 型定義（CaseRow, PropertyRow, Settings, LandPurchaseContractContext, DocumentMasterRow, PartnerRow, AgentRow, BatchResult 等） | Phase 1 → Phase 2 拡張 |
 | `src/handlers/documentHandler.ts` | 単発書類生成オーケストレーション（土地売買契約書のみ） | Phase 1 |
-| `src/handlers/batchHandler.ts` | 複数案件×複数書類のバッチ処理（書類マスタの「有効」=TRUE 書類のみ） | Phase 2 |
+| `src/handlers/batchHandler.ts` | 複数案件×複数書類のバッチ処理（書類マスタの「有効」=TRUE 書類のみ。Phase 3 で 14 書類すべての書類ID ディスパッチ対応） | Phase 2 → Phase 3 拡張 |
 | `src/handlers/onEditHandler.ts` | 案件パターン編集時に書類列の初期チェック投入 | Phase 2 |
 | `src/handlers/webAppHandler.ts` | doGet / doPost Web App スタブ（将来の API エンドポイント用） | Phase 1 |
 | `src/services/sheetService.ts` | 案件一覧・物件・設定シート読み書き（getSettings / getActiveCaseRow / getPropertyRowsByCaseId / getSelectedCaseRows / updateCaseRowStatus / getCheckedDocumentNames 等） | Phase 1 → Phase 2 拡張 |
-| `src/services/templateService.ts` | Docs テンプレ複製・プレースホルダ一括置換・PDF 化（generatePdfFromTemplate / generatePdfToFolder） | Phase 1 → Phase 2 で `generatePdfToFolder` 追加 |
-| `src/services/placeholderService.ts` | `{{key}}` 置換・和暦変換・カンマ整形（buildLandPurchaseContractContext） | Phase 1 |
+| `src/services/templateService.ts` | Docs テンプレ複製・プレースホルダ一括置換・PDF 化（generatePdfFromTemplate / generatePdfToFolder）+ `{{#each items}}` 繰返し展開（expandRepeatBlocks_） | Phase 1 → Phase 2 で `generatePdfToFolder`、Phase 3 で繰返し展開を追加 |
+| `src/services/placeholderService.ts` | `{{key}}` 置換・和暦変換・カンマ整形（A①/A²/A³/B¹/B² 4 契約書 + 法務局 6 書類分の Context ビルダー、物件繰返しヘルパー） | Phase 1 → Phase 3 拡張 |
 | `src/services/documentMasterService.ts` | 書類マスタ読み込み（findByName / getEnabledRowById / getMatchingDocuments / extractFileIdFromUrl） | Phase 2 |
 | `src/services/partnerMasterService.ts` | 取引先マスタ読み込み（getById） | Phase 2 |
 | `src/services/agentMasterService.ts` | 代理人マスタ読み込み（getById） | Phase 2（利用は Phase 3 から） |
@@ -362,14 +362,36 @@ Drive/
 
 | ファイル | 役割 | 追加 Phase |
 |---|---|---|
-| `src/dialog.html` | バッチ実行結果ダイアログ（現状は SpreadsheetApp.getUi().alert で代用） | Phase 3 で必要に応じて |
+| `src/dialog.html` | バッチ実行結果ダイアログ（現状は SpreadsheetApp.getUi().alert で代用） | Phase 4 以降で必要に応じて |
 | `src/handlers/onFormSubmitHandler.ts` | フォーム送信トリガー処理 | Phase 4 |
-| 各書類別 Context ビルダー（placeholderService 拡張） | A①/A②/B①/B² 契約書・法務局 5 書類の Context 生成 | Phase 3 |
-| 繰返し処理（`{{#each items}}`）対応 | 物件明細を表として差し込み | Phase 3 |
+| 見積書 / 請求書 / 売上計算シート / チェックリスト Context ビルダー | Sheets テンプレ前提のため別実装が必要 | Phase 6 |
 
 ---
 
 ## 12. 設計変更履歴
+
+### 2026-05-28: Phase 3 — 全 14 書類の Context ビルダーと繰返し展開
+
+**変更内容**:
+1. `templateService.expandRepeatBlocks_` を新設し、Docs 内の `{{#each items}}...{{/each}}` ブロックを物件件数で展開可能に。
+2. `placeholderService` に以下のビルダーを追加:
+   - A② `buildLandTreeContractContext` / A① `buildTreeContractContext`
+   - B² `buildCustomerLandContractContext` / B¹ `buildCustomerTreeContractContext`（買主は取引先マスタ参照）
+   - 法務局 6 書類（共通 Context + 申請書の繰返しと税金仮計算）
+3. `batchHandler.buildContextForDocument_` を全 14 書類ディスパッチに拡張。
+4. 物件シートに `不動産番号` 列、案件一覧に Phase 3 用 5 列（売主生年月日 / 売主旧住所 / 売主新住所 / 住所変更日 / 法務局支局）追加済み。
+
+**仮計算ルール（ユーザー確定）**:
+- A② 立木付土地売買契約書: 土地代金 = 案件マスタ「売買金額」、立木代金 = 物件シート金額合計、合計 = 土地 + 立木×1.1
+- A① 立木売買契約書: 売買金額 = 案件マスタ「売買金額」（無ければ物件金額合計×1.1）
+- B 系統契約書: 売買金額合計 = 案件マスタ「売買金額」（山林/土地内訳は空運用、手で調整）
+- 法務局申請書: 課税価格 = 土地代金、登録免許税 = 課税価格 × 2%
+- 住所変更登記申請書: 登録免許税 = 物件件数 × 1,000 円
+
+**未対応（Phase 6 以降）**:
+- 見積書 / 請求書 / 売上計算シート / チェックリスト（Sheets テンプレ前提）
+- B 系統契約書の山林/土地金額内訳の自動計算
+- `{{権利書がない理由}}` を案件マスタの列として持つかは Phase 4 以降で判断（現状は空運用）
 
 ### 2026-05-27: 出力書類リストのスプレッドシート移行と取引先マスタ導入
 

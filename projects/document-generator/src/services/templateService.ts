@@ -106,6 +106,9 @@ namespace TemplateService {
 
       // 複製した Docs のプレースホルダを置換
       const tempDoc = DocumentApp.openById(tempCopy.getId());
+      // 先に {{#each items}}...{{/each}} ブロックを展開してから単純置換
+      // 根拠: placeholder-rules.md § 2「繰返し記法（Phase 3 以降）」
+      expandRepeatBlocks_(tempDoc, (replacements as unknown as RepeatableContext).items);
       replaceAllPlaceholders_(tempDoc, replacements);
       tempDoc.saveAndClose();
 
@@ -132,6 +135,118 @@ namespace TemplateService {
         }
       }
     }
+  }
+
+  // ----------------------------------------------------------
+  // 繰返し処理（Phase 3）
+  // ----------------------------------------------------------
+
+  /**
+   * Docs 本文の {{#each items}} 〜 {{/each}} ブロックを物件件数だけ複製展開する。
+   *
+   * 根拠:
+   *   - placeholder-rules.md § 2「繰返し記法（Phase 3 以降）」
+   *   - documents/legal_documents_placeholders.md「不動産の表示（繰返し処理 Phase 3）」
+   *
+   * 動作:
+   *   - 開始マーカー段落「{{#each items}}」と終了マーカー段落「{{/each}}」を本文から検出
+   *   - 開始〜終了の間の段落（本体テンプレート）を、items.length 件分複製
+   *   - 複製した各段落の `{{key}}` を items[i] の対応値で置換
+   *   - マーカー段落（開始・終了）は削除
+   *
+   * 制約:
+   *   - マーカー段落は単独の段落として書く（同じ段落に他のテキスト混在は非対応）
+   *   - ネストはサポートしない
+   *
+   * @param doc   置換対象の Docs
+   * @param items 繰返し展開する辞書配列。undefined または空配列ならマーカー段落だけ削除
+   */
+  function expandRepeatBlocks_(
+    doc: GoogleAppsScript.Document.Document,
+    items: Array<{ [key: string]: string }> | undefined
+  ): void {
+    const body = doc.getBody();
+    const startMarker = "{{#each items}}";
+    const endMarker = "{{/each}}";
+
+    // 同一文書に複数の {{#each}} がある可能性は Phase 3 では想定外。1 回検出して処理し終わったらループ脱出
+    for (let safety = 0; safety < 10; safety++) {
+      const range = findMarkerRange_(body, startMarker, endMarker);
+      if (!range) return;
+
+      const { startIdx, endIdx } = range;
+
+      // 開始〜終了の間にある段落をテンプレートとして抜き出す（インデックスはコピー）
+      const templateParagraphs: GoogleAppsScript.Document.Paragraph[] = [];
+      for (let i = startIdx + 1; i < endIdx; i++) {
+        templateParagraphs.push(body.getChild(i).asParagraph());
+      }
+
+      // items が空 or undefined ならマーカーと本体段落をすべて削除
+      if (!items || items.length === 0) {
+        for (let i = endIdx; i >= startIdx; i--) {
+          body.removeChild(body.getChild(i));
+        }
+        Logger_.info(
+          `[TemplateService] 繰返しブロックを削除（items 空）`
+        );
+        continue;
+      }
+
+      // 終了マーカー段落の直後に items.length 件分の複製を挿入する
+      // 元のテンプレ段落 + マーカー2件はあとで削除
+      let insertAt = endIdx + 1;
+      for (const item of items) {
+        for (const tp of templateParagraphs) {
+          const copyText = tp.copy();
+          body.insertParagraph(insertAt, copyText.getText());
+          // copy() ではスタイルを引き継いだ Paragraph の挿入はしない簡易実装
+          // Phase 3 では装飾不要なテキストのみのテンプレ前提
+          const inserted = body.getChild(insertAt).asParagraph();
+          // インライン置換
+          for (const key of Object.keys(item)) {
+            inserted.replaceText(`{{${key}}}`, item[key] ?? "");
+          }
+          insertAt++;
+        }
+      }
+
+      // 元のテンプレ段落 + マーカー2件を削除（後ろから消すと index がずれない）
+      for (let i = endIdx; i >= startIdx; i--) {
+        body.removeChild(body.getChild(i));
+      }
+
+      Logger_.info(
+        `[TemplateService] 繰返しブロックを ${items.length} 件分展開`
+      );
+    }
+  }
+
+  /**
+   * 本文から {{#each items}} と {{/each}} の段落インデックスを検出する。
+   * 見つからない場合は null。
+   */
+  function findMarkerRange_(
+    body: GoogleAppsScript.Document.Body,
+    startMarker: string,
+    endMarker: string
+  ): { startIdx: number; endIdx: number } | null {
+    const numChildren = body.getNumChildren();
+    let startIdx = -1;
+    let endIdx = -1;
+    for (let i = 0; i < numChildren; i++) {
+      const child = body.getChild(i);
+      if (child.getType() !== DocumentApp.ElementType.PARAGRAPH) continue;
+      const text = child.asParagraph().getText();
+      if (startIdx < 0 && text.indexOf(startMarker) >= 0) {
+        startIdx = i;
+      } else if (startIdx >= 0 && text.indexOf(endMarker) >= 0) {
+        endIdx = i;
+        break;
+      }
+    }
+    if (startIdx < 0 || endIdx < 0) return null;
+    return { startIdx, endIdx };
   }
 
   // ----------------------------------------------------------
